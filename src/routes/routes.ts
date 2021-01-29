@@ -1,6 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { buildErrorResponse, buildSuccessResponse, checkForNestedRuleField, getFields } from '../utils/utils';
+import {
+    buildErrorResponse,
+    buildSuccessResponse,
+    buildFailedResponse,
+    checkForNestedRuleField,
+    getFields
+} from '../utils/utils';
 
 const router = Router();
 
@@ -21,17 +27,18 @@ router.get('/', (req: Request, res: Response) => {
 
 router.post('/validate-rule', (req: Request, res: Response) => {
 
+    //retrieve rule and data sent from client
     const { rule, data } = req.body;
-
-    const ruleExists: boolean = checkIfRuleExists(rule);
-    if (!ruleExists) {
-        return res.json(buildErrorResponse("rule is required."));
-    }
 
     const ruleFieldExists: boolean = checkIfRuleFieldExists(rule);
     if (!ruleFieldExists) {
         return res.status(StatusCodes.BAD_REQUEST)
             .json(buildErrorResponse("[field] is required."));
+    }
+
+    const ruleExists: boolean = checkIfRuleExists(rule);
+    if (!ruleExists) {
+        return res.json(buildErrorResponse("rule is required."));
     }
 
     const isRuleFieldValid: boolean = checkIfRuleFieldIsValid(rule);
@@ -45,15 +52,15 @@ router.post('/validate-rule', (req: Request, res: Response) => {
     }
 
     const results = checkIfRuleFieldExistsInData(rule, data);
-    const {rootKeyExists, isNestedObject, firstKeyExists, secondKeyExists} = results;
-    
+    const { rootKeyExists, isNestedObject, firstKeyExists, secondKeyExists } = results;
+
     if (!isNestedObject) {
         if (!rootKeyExists) {
             return res.status(StatusCodes.BAD_REQUEST)
                 .json(buildErrorResponse("field " + rule.field + " is missing from data."));
         }
     } else {
-        let fields:Array<string> = getFields(rule.field); 
+        let fields: Array<string> = getFields(rule.field);
         if (!firstKeyExists) {
             return res.status(StatusCodes.BAD_REQUEST)
                 .json(buildErrorResponse("field " + fields[0] + " is missing from data."));
@@ -69,7 +76,7 @@ router.post('/validate-rule', (req: Request, res: Response) => {
         return res.status(StatusCodes.OK).json(buildSuccessResponse(message, rule, data));
     } else {
         let message = "field " + rule.field + " failed validation.";
-        return res.status(StatusCodes.BAD_REQUEST).json(buildSuccessResponse(message, rule, data));
+        return res.status(StatusCodes.BAD_REQUEST).json(buildFailedResponse(message, rule, data));
     }
 });
 
@@ -80,7 +87,12 @@ const checkIfRuleExists = (rule: Object) => {
 }
 
 const checkIfRuleFieldExists = (rule: Object) => {
-    return "field" in rule;
+    
+    if (rule === undefined) {
+        return false;
+    } else {
+        return rule.hasOwnProperty("field"); 
+    }
 }
 
 const checkIfRuleFieldIsValid = (rule: { field, condition, condition_value }) => {
@@ -92,30 +104,28 @@ const checkIfRuleFieldIsValid = (rule: { field, condition, condition_value }) =>
 }
 
 const checkIfRuleFieldExistsInData = (rule, data) => {
-    let exists:boolean = true;
-    let isNested:boolean = false;
+    let exists: boolean = true;
+    let isNestedObject: boolean = false;
     let firstKeyExists: boolean = false;
-    let secondKeyExists:boolean = false;
+    let secondKeyExists: boolean = false;
 
     const field = rule.field;
-    if (Array.isArray(data)) {
-        for (let i = 0; i < data.length; i++) {
-            console.log(field);
-            console.log(data[i]);
-            if (data[i] === field) {
-                exists = true;
-                break;
-            }
-        }
+
+    if (data === undefined) {
         exists = false;
     } else if (typeof data === "object") {
+        // check if the object is a nested object
         let fieldsToCheck = getFields(field);
-        
+
         if (fieldsToCheck.length > 1) {
-            isNested = true;
+            isNestedObject = true;
         }
 
-        if (isNested) {
+        if (isNestedObject) {
+            /* Check if the root key exists in the data. If the first 
+             * If the first key exists check if the second key also exists within the 
+             * first level object. If both exist then the check passes. 
+             */ 
             firstKeyExists = (data.hasOwnProperty(fieldsToCheck[0])) ? true : false;
             if (firstKeyExists) {
                 secondKeyExists = (data[fieldsToCheck[0]].hasOwnProperty(fieldsToCheck[1])) ? true : false;
@@ -123,11 +133,11 @@ const checkIfRuleFieldExistsInData = (rule, data) => {
         } else {
             if (!(field in data)) exists = false;
         }
-    }
+    } 
 
-   let results =  {
+    let results = {
         rootKeyExists: exists,
-        isNestedObject: isNested,
+        isNestedObject: isNestedObject,
         firstKeyExists: firstKeyExists,
         secondKeyExists: secondKeyExists
     }
@@ -140,16 +150,16 @@ const checkRuleAgainstCondition = (rule, data) => {
     let passed = false;
     let conditionValue = rule.condition_value;
     let isNestedRule: boolean = checkForNestedRuleField(rule.field);
-    let fieldValue: any; 
+    let fieldValue: any;
 
     if (isNestedRule) {
-        let fields:Array<string> = getFields(rule.field);
+        let fields: Array<string> = getFields(rule.field);
         let firstObject = data[fields[0]];
         fieldValue = firstObject[fields[1]];
     } else {
         fieldValue = data[rule.field];
     }
-    
+
     switch (rule.condition) {
         case "gte":
             if (fieldValue >= conditionValue) passed = true;
@@ -164,7 +174,7 @@ const checkRuleAgainstCondition = (rule, data) => {
             if (fieldValue !== conditionValue) passed = true;
             break;
         case "contains":
-            if (fieldValue.incldues(conditionValue)) passed = true;
+            if (fieldValue.includes(conditionValue)) passed = true;
             break;
     }
 
