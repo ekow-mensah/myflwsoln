@@ -5,6 +5,7 @@ import cors from 'cors';
 import {validateJSON} from './routes/middleware/validate-json';
 
 import {router} from './routes/routes';
+const PORT = process.env.PORT
 
 const app = express();
 app.use(helmet());
@@ -15,4 +16,4 @@ app.use(cors());
 app.use("/", router);
 app.use("/validate-rule", router);
 app.use(validateJSON);
-app.listen();
+app.listen(PORT);
