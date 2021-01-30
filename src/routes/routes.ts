@@ -30,15 +30,15 @@ router.post('/validate-rule', (req: Request, res: Response) => {
     //retrieve rule and data sent from client
     const { rule, data } = req.body;
 
+    const ruleExists: boolean = checkIfRuleExists(rule);
+    if (!ruleExists) {
+        return res.json(buildErrorResponse("rule is required."));
+    }
+    
     const ruleFieldExists: boolean = checkIfRuleFieldExists(rule);
     if (!ruleFieldExists) {
         return res.status(StatusCodes.BAD_REQUEST)
             .json(buildErrorResponse("[field] is required."));
-    }
-
-    const ruleExists: boolean = checkIfRuleExists(rule);
-    if (!ruleExists) {
-        return res.json(buildErrorResponse("rule is required."));
     }
 
     const isRuleFieldValid: boolean = checkIfRuleFieldIsValid(rule);
