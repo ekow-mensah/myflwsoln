@@ -5,7 +5,7 @@ import cors from 'cors';
 import {validateJSON} from './routes/middleware/validate-json';
 
 import {router} from './routes/routes';
-const PORT = process.env.PORT
+const PORT = 9000
 
 const app = express();
 app.use(helmet());
