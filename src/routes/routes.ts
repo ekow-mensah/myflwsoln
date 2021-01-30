@@ -174,6 +174,12 @@ const checkRuleAgainstCondition = (rule, data) => {
             if (fieldValue !== conditionValue) passed = true;
             break;
         case "contains":
+            if (typeof fieldValue == "number" && typeof conditionValue === "number") {
+                fieldValue = fieldValue.toString();
+                conditionValue = conditionValue.toString();
+
+                if (fieldValue.includes(conditionValue)) passed = true;
+            }
             if (fieldValue.includes(conditionValue)) passed = true;
             break;
     }
